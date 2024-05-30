@@ -31,7 +31,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
             log.Println("Read Error:", err)
             break
         }
-        log.Printf("Received: %s", message)
+        // log.Printf("Received: %s", message)
         fmt.Println(string(message))
         // saveMessage(string(message))
     }
