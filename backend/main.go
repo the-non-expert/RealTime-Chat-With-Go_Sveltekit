@@ -17,26 +17,55 @@ var upgrader = websocket.Upgrader{
     },
 }
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
-    conn, err := upgrader.Upgrade(w, r, nil)
-    if err != nil {
-        log.Println("WebSocket Upgrade:", err)
-        return
-    }
-    defer conn.Close()
+var clients = make(map[*websocket.Conn]bool) // connected clients
+var broadcast = make(chan string)            // broadcast channel
 
-    for {
-        _, message, err := conn.ReadMessage()
-        if err != nil {
-            log.Println("Read Error:", err)
-            break
-        }
-        // log.Printf("Received: %s", message)
-        fmt.Println(string(message))
-        // saveMessage(string(message))
-    }
+// Handle WebSocket connections
+func handleConnections(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("WebSocket Upgrade:", err)
+		return
+	}
+	defer conn.Close()
+	clients[conn] = true
+    logConnectedClients()
+
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("Read Error:", err)
+			delete(clients, conn)
+			break
+		}
+		log.Printf("Received: %s", message)
+		broadcast <- string(message)
+	}
 }
 
+// Broadcast messages to all clients
+func handleMessages() {
+	for {
+		msg := <-broadcast
+		log.Printf("Broadcasting message: %s", msg)
+		for client := range clients {
+			err := client.WriteMessage(websocket.TextMessage, []byte(msg))
+			if err != nil {
+				log.Println("Write Error:", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
+	}
+}
+
+func logConnectedClients() {
+	log.Println("Connected clients:")
+	for client := range clients {
+		log.Printf("Client: %v", client.RemoteAddr())
+	}
+}
 
 func setupRoutes() *gin.Engine {
     r := gin.Default()
@@ -59,6 +88,9 @@ func setupRoutes() *gin.Engine {
 func main() {
     // initDB()
     fmt.Println("Chat App v0.0.1")
+
+    // Start handling messages in a separate goroutine
+	go handleMessages()
 
     r := setupRoutes()
 

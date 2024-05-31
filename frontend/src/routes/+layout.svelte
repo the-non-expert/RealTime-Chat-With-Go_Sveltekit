@@ -30,10 +30,15 @@
     socket.onmessage = (event: MessageEvent) => {
       messages = [...messages, event.data];
       console.log(messages);
+      console.log("Received message from server: ", event.data);
     };
 
     socket.onclose = () => {
       console.log("Disconnected from WebSocket server");
+    };
+
+    socket.onerror = (error) => {
+      console.error("WebSocket Error:", error);
     };
 
     return () => {
